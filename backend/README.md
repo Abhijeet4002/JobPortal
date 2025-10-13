@@ -1,0 +1,18 @@
+# Backend (Express + MongoDB)
+
+## Run locally
+```powershell
+cd backend
+npm install
+npm run dev
+```
+
+## .env example
+```
+PORT=8000
+MONGO_URI=<your mongodb uri>
+JWT_SECRET=<your jwt secret>
+CLOUDINARY_CLOUD_NAME=<your cloud name>
+CLOUDINARY_API_KEY=<your api key>
+CLOUDINARY_API_SECRET=<your api secret>
+```
