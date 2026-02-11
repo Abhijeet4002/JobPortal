@@ -28,7 +28,6 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
 
 ## Environment variables (backend)
 
@@ -37,13 +36,11 @@ Open http://localhost:5173
 - JWT_SECRET: secret for JWT signing (fallback: SECRET_KEY)
 - CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET: Cloudinary credentials
 
-See docs/05-setup.md for a full example and notes on cookies/CORS.
 
 ## Project structure
 
 - backend/ — Express API, models, controllers, routes, auth, uploads
 - frontend/ — React app with routes, state, and UI
-- docs/ — Interview-ready deep dive: architecture, APIs, decisions, challenges, future work
 
 ## Highlights
 
