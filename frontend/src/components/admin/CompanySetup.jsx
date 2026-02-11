@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import Navbar from '../shared/Navbar'
 import { Button } from '../ui/button'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, Building2, Globe, MapPin, FileText, Image } from 'lucide-react'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import axios from 'axios'
 import { COMPANY_API_END_POINT } from '@/utils/constant'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useSelector } from 'react-redux'
 import useGetCompanyById from '@/hooks/useGetCompanyById'
@@ -22,7 +21,7 @@ const CompanySetup = () => {
         location: "",
         file: null
     });
-    const {singleCompany} = useSelector(store=>store.company);
+    const { singleCompany } = useSelector(store => store.company);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
@@ -48,9 +47,7 @@ const CompanySetup = () => {
         try {
             setLoading(true);
             const res = await axios.put(`${COMPANY_API_END_POINT}/update/${params.id}`, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                },
+                headers: { 'Content-Type': 'multipart/form-data' },
                 withCredentials: true
             });
             if (res.data.success) {
@@ -59,86 +56,93 @@ const CompanySetup = () => {
             }
         } catch (error) {
             console.log(error);
-            toast.error(error.response.data.message);
+            toast.error(error?.response?.data?.message || 'Update failed');
         } finally {
             setLoading(false);
         }
     }
 
     useEffect(() => {
-        const googleExample = "Google is a multinational technology company specializing in Internet-related services and products, including online advertising, search engine, cloud computing, software, and hardware. Founded in 1998, it is known for innovation, scale, and a mission to organize the world’s information and make it universally accessible and useful.";
         setInput({
             name: singleCompany.name || "",
-            description: (singleCompany.description && singleCompany.description.trim().length > 0) ? singleCompany.description : googleExample,
+            description: singleCompany.description || "",
             website: singleCompany.website || "",
             location: singleCompany.location || "",
-            file: singleCompany.file || null
+            file: null
         })
-    },[singleCompany]);
+    }, [singleCompany]);
+
+    const Field = ({ icon: Icon, label, children }) => (
+        <div>
+            <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 mb-1.5">
+                <Icon className="w-4 h-4 text-gray-400" /> {label}
+            </label>
+            {children}
+        </div>
+    );
 
     return (
-        <div>
-            <div className='max-w-xl mx-auto my-10'>
-                <form onSubmit={submitHandler}>
-                    <div className='flex items-center gap-5 p-8'>
-                        <Button onClick={() => navigate("/admin/companies")} variant="outline" className="flex items-center gap-2 text-gray-500 font-semibold">
-                            <ArrowLeft />
-                            <span>Back</span>
-                        </Button>
-                        <h1 className='font-bold text-xl'>Company Setup</h1>
-                    </div>
-                    <div className='grid grid-cols-2 gap-4'>
-                        <div>
-                            <Label>Company Name</Label>
-                            <Input
-                                type="text"
-                                name="name"
-                                value={input.name}
-                                onChange={changeEventHandler}
-                            />
-                        </div>
-                        <div className='col-span-2'>
-                            <Label>Description</Label>
-                            <Textarea
-                                name="description"
-                                value={input.description}
-                                onChange={changeEventHandler}
-                                placeholder="Describe the company (mission, products, culture, benefits, etc.)"
-                            />
+        <div className="animate-fade-in max-w-xl mx-auto">
+            <Link to="/admin/companies" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-[var(--primary)] mb-6 font-medium">
+                <ArrowLeft className="w-4 h-4" /> Back to companies
+            </Link>
+
+            <div className="card-elevated overflow-hidden">
+                <div className="gradient-hero p-6 text-white">
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                            {singleCompany.logo ? (
+                                <img src={singleCompany.logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                            ) : (
+                                <Building2 className="w-6 h-6 text-white" />
+                            )}
                         </div>
                         <div>
-                            <Label>Website</Label>
-                            <Input
-                                type="text"
-                                name="website"
-                                value={input.website}
-                                onChange={changeEventHandler}
-                            />
-                        </div>
-                        <div>
-                            <Label>Location</Label>
-                            <Input
-                                type="text"
-                                name="location"
-                                value={input.location}
-                                onChange={changeEventHandler}
-                            />
-                        </div>
-                        <div>
-                            <Label>Logo</Label>
-                            <Input
-                                type="file"
-                                accept="image/*"
-                                onChange={changeFileHandler}
-                            />
+                            <h1 className="text-xl font-bold">Company Setup</h1>
+                            <p className="text-white/70 text-sm">Update your company information</p>
                         </div>
                     </div>
-                    {
-                        loading ? <Button className="w-full my-4"> <Loader2 className='mr-2 h-4 w-4 animate-spin' /> Please wait </Button> : <Button type="submit" className="w-full my-4">Update</Button>
-                    }
+                </div>
+
+                <form onSubmit={submitHandler} className="p-6 space-y-4">
+                    <Field icon={Building2} label="Company Name">
+                        <Input type="text" name="name" value={input.name} onChange={changeEventHandler} className="rounded-xl" />
+                    </Field>
+
+                    <Field icon={FileText} label="Description">
+                        <Textarea
+                            name="description"
+                            value={input.description}
+                            onChange={changeEventHandler}
+                            placeholder="Describe the company (mission, products, culture, benefits, etc.)"
+                            className="rounded-xl resize-none h-28"
+                        />
+                    </Field>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Field icon={Globe} label="Website">
+                            <Input type="text" name="website" value={input.website} onChange={changeEventHandler} placeholder="https://example.com" className="rounded-xl" />
+                        </Field>
+                        <Field icon={MapPin} label="Location">
+                            <Input type="text" name="location" value={input.location} onChange={changeEventHandler} placeholder="e.g. New York, NY" className="rounded-xl" />
+                        </Field>
+                    </div>
+
+                    <Field icon={Image} label="Logo">
+                        <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-white hover:border-[var(--primary)] cursor-pointer transition-all">
+                            <Image className="w-5 h-5 text-gray-400" />
+                            <span className="text-sm text-gray-500">
+                                {input.file ? input.file.name : 'Upload company logo'}
+                            </span>
+                            <input type="file" accept="image/*" onChange={changeFileHandler} className="hidden" />
+                        </label>
+                    </Field>
+
+                    <Button type="submit" disabled={loading} className="w-full h-11 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-dark)] text-white font-semibold mt-2">
+                        {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...</> : 'Update Company'}
+                    </Button>
                 </form>
             </div>
-
         </div>
     )
 }

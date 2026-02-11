@@ -1,9 +1,9 @@
-import { Application } from "../models/application.model.js";
-import { Job } from "../models/job.model.js";
+import prisma from "../utils/db.js";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloudinary.js";
 import archiver from "archiver";
 import https from "https";
+import { addId, formatUser } from "../utils/format.js";
 
 export const applyJob = async (req, res) => {
     try {
@@ -13,146 +13,171 @@ export const applyJob = async (req, res) => {
             return res.status(400).json({
                 message: "Job id is required.",
                 success: false
-            })
-        };
-        // check if the user has already applied for the job
-    const existingApplication = await Application.findOne({ job: jobId, applicant: userId, status: { $ne: 'withdrawn' } });
+            });
+        }
+        // Check for existing non-withdrawn application
+        const existingApplication = await prisma.application.findFirst({
+            where: {
+                jobId,
+                applicantId: userId,
+                status: { not: 'withdrawn' }
+            }
+        });
 
         if (existingApplication) {
             return res.status(400).json({
-                message: "You have already applied for this jobs",
+                message: "You have already applied for this job",
                 success: false
             });
         }
 
-        // check if the jobs exists
-    const job = await Job.findById(jobId);
+        const job = await prisma.job.findUnique({ where: { id: jobId } });
         if (!job) {
             return res.status(404).json({
                 message: "Job not found",
                 success: false
-            })
+            });
         }
         if (job.closed) {
             return res.status(400).json({ message: 'Job is closed', success: false });
         }
-    // Optional resume upload/link
+
         let resumeUrl, resumeOriginalName;
-    let resumeLink = req.body?.resumeLink;
+        let resumeLink = req.body?.resumeLink;
         if (req.file) {
             const fileUri = getDataUri(req.file);
-            const upload = await cloudinary.uploader.upload(fileUri.content);
+            const upload = await cloudinary.uploader.upload(fileUri.content, {
+                resource_type: 'auto'
+            });
             resumeUrl = upload.secure_url;
             resumeOriginalName = req.file.originalname;
         }
 
-        // create a new application
-        const newApplication = await Application.create({
-            job: jobId,
-            applicant: userId,
-            ...(resumeUrl ? { resumeUrl, resumeOriginalName } : {}),
-            ...(resumeLink ? { resumeLink } : {})
+        await prisma.application.create({
+            data: {
+                jobId,
+                applicantId: userId,
+                ...(resumeUrl ? { resumeUrl, resumeOriginalName } : {}),
+                ...(resumeLink ? { resumeLink } : {})
+            }
         });
 
-        job.applications.push(newApplication._id);
-        await job.save();
+        // No need to push to job.applications — Prisma manages the relation via foreign key
         return res.status(201).json({
             message: "Job applied successfully.",
             success: true
-        })
+        });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
-};
-export const getAppliedJobs = async (req,res) => {
+}
+
+export const getAppliedJobs = async (req, res) => {
     try {
         const userId = req.id;
-        const application = await Application.find({applicant:userId}).sort({createdAt:-1}).populate({
-            path:'job',
-            options:{sort:{createdAt:-1}},
-            populate:{
-                path:'company',
-                options:{sort:{createdAt:-1}},
+        const applications = await prisma.application.findMany({
+            where: { applicantId: userId },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                job: {
+                    include: { company: true }
+                }
             }
         });
-        if(!application){
-            return res.status(404).json({
-                message:"No Applications",
-                success:false
-            })
-        };
+
         return res.status(200).json({
-            application,
-            success:true
-        })
+            application: applications.map(app => addId(app)),
+            success: true
+        });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
-// admin dekhega kitna user ne apply kiya hai
-export const getApplicants = async (req,res) => {
+
+export const getApplicants = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const job = await Job.findById(jobId).populate({
-            path:'applications',
-            options:{sort:{createdAt:-1}},
-            populate:{
-                path:'applicant'
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            include: {
+                applications: {
+                    orderBy: { createdAt: 'desc' },
+                    include: { applicant: true }
+                }
             }
         });
-        if(!job){
+        if (!job) {
             return res.status(404).json({
-                message:'Job not found.',
-                success:false
-            })
+                message: 'Job not found.',
+                success: false
+            });
+        }
+
+        // Format: add _id to job and applications, formatUser for applicants (profile nesting)
+        const formatted = {
+            ...job,
+            _id: job.id,
+            applications: (job.applications || []).map(app => ({
+                ...app,
+                _id: app.id,
+                applicant: app.applicant ? formatUser(app.applicant) : null
+            }))
         };
+
         return res.status(200).json({
-            job, 
-            succees:true
+            job: formatted,
+            success: true
         });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
-export const updateStatus = async (req,res) => {
+
+export const updateStatus = async (req, res) => {
     try {
-        const {status} = req.body;
+        const { status } = req.body;
         const applicationId = req.params.id;
-        if(!status){
+        if (!status) {
             return res.status(400).json({
-                message:'status is required',
-                success:false
-            })
-        };
+                message: 'Status is required',
+                success: false
+            });
+        }
 
-        // find the application by applicantion id
-        const application = await Application.findOne({_id:applicationId});
-        if(!application){
+        const application = await prisma.application.findUnique({ where: { id: applicationId } });
+        if (!application) {
             return res.status(404).json({
-                message:"Application not found.",
-                success:false
-            })
-        };
+                message: "Application not found.",
+                success: false
+            });
+        }
 
-        // update the status
-        application.status = status.toLowerCase();
-        await application.save();
+        await prisma.application.update({
+            where: { id: applicationId },
+            data: { status: status.toLowerCase() }
+        });
 
         return res.status(200).json({
-            message:"Status updated successfully.",
-            success:true
+            message: "Status updated successfully.",
+            success: true
         });
 
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
 
-// Download all resumes for a job as a ZIP streamed to the client
 export const downloadAllResumes = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const job = await Job.findById(jobId).populate('applications');
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            include: { applications: true }
+        });
         if (!job) return res.status(404).json({ message: 'Job not found', success: false });
 
         const resumes = (job.applications || []).filter(a => a.resumeUrl);
@@ -165,11 +190,10 @@ export const downloadAllResumes = async (req, res) => {
         archive.on('error', err => res.status(500).end());
         archive.pipe(res);
 
-        // Fetch each file and append to the archive
         for (const app of resumes) {
             await new Promise((resolve, reject) => {
                 https.get(app.resumeUrl, (fileRes) => {
-                    const filename = app.resumeOriginalName || `resume-${app._id}.pdf`;
+                    const filename = app.resumeOriginalName || `resume-${app.id}.pdf`;
                     archive.append(fileRes, { name: filename });
                     fileRes.on('end', resolve);
                     fileRes.on('error', reject);
@@ -180,22 +204,28 @@ export const downloadAllResumes = async (req, res) => {
         archive.finalize();
     } catch (e) {
         console.log(e);
-        res.status(500).json({ message: 'Failed to build ZIP', success: false });
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Failed to build ZIP', success: false });
+        }
     }
 }
 
-// Withdraw application by applicant (student)
 export const withdrawApplication = async (req, res) => {
     try {
         const userId = req.id;
         const applicationId = req.params.id;
-        const application = await Application.findOne({ _id: applicationId, applicant: userId });
+        const application = await prisma.application.findFirst({
+            where: { id: applicationId, applicantId: userId }
+        });
         if (!application) return res.status(404).json({ message: 'Application not found', success: false });
         if (application.status === 'accepted') return res.status(400).json({ message: 'Cannot withdraw an accepted application', success: false });
-        application.status = 'withdrawn';
-        await application.save();
+        await prisma.application.update({
+            where: { id: applicationId },
+            data: { status: 'withdrawn' }
+        });
         return res.status(200).json({ message: 'Application withdrawn', success: true });
     } catch (e) {
         console.log(e);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }

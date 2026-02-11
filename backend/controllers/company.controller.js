@@ -1,7 +1,7 @@
-import { Company } from "../models/company.model.js";
+import prisma from "../utils/db.js";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloudinary.js";
-import mongoose from "mongoose";
+import { addId } from "../utils/format.js";
 
 export const registerCompany = async (req, res) => {
     try {
@@ -12,103 +12,121 @@ export const registerCompany = async (req, res) => {
                 success: false
             });
         }
-        let company = await Company.findOne({ name: companyName });
-        if (company) {
+        const existing = await prisma.company.findUnique({ where: { name: companyName } });
+        if (existing) {
             return res.status(400).json({
                 message: "You can't register same company.",
                 success: false
-            })
-        };
-        company = await Company.create({
-            name: companyName,
-            userId: req.id
+            });
+        }
+        const company = await prisma.company.create({
+            data: {
+                name: companyName,
+                userId: req.id
+            }
         });
 
         return res.status(201).json({
             message: "Company registered successfully.",
-            company,
+            company: addId(company),
             success: true
-        })
+        });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
 export const getCompany = async (req, res) => {
     try {
-        const userId = req.id; // logged in user id
-        const companies = await Company.find({ userId });
-        if (!companies) {
-            return res.status(404).json({
-                message: "Companies not found.",
-                success: false
-            })
-        }
+        const userId = req.id;
+        const companies = await prisma.company.findMany({ where: { userId } });
         return res.status(200).json({
-            companies,
-            success:true
-        })
+            companies: companies.map(c => addId(c)),
+            success: true
+        });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
-// get company by id
 export const getCompanyById = async (req, res) => {
     try {
         const companyId = req.params.id;
-        const company = await Company.findById(companyId);
+        const company = await prisma.company.findUnique({ where: { id: companyId } });
         if (!company) {
             return res.status(404).json({
                 message: "Company not found.",
                 success: false
-            })
+            });
         }
         return res.status(200).json({
-            company,
+            company: addId(company),
             success: true
-        })
+        });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
 export const updateCompany = async (req, res) => {
     try {
         const { name, description, website, location } = req.body;
 
-        const updateData = { name, description, website, location };
+        const updateData = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (website !== undefined) updateData.website = website;
+        if (location !== undefined) updateData.location = location;
+
         const file = req.file;
         if (file) {
             const fileUri = getDataUri(file);
-            const cloudResponse = await cloudinary.uploader.upload(fileUri.content);
+            const cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+                resource_type: 'auto'
+            });
             updateData.logo = cloudResponse.secure_url;
         }
 
-        const company = await Company.findByIdAndUpdate(req.params.id, updateData, { new: true });
+        const company = await prisma.company.update({
+            where: { id: req.params.id },
+            data: updateData
+        }).catch(e => {
+            if (e.code === 'P2025') return null;
+            throw e;
+        });
 
         if (!company) {
             return res.status(404).json({
                 message: "Company not found.",
                 success: false
-            })
+            });
         }
         return res.status(200).json({
-            message:"Company information updated.",
-            success:true
-        })
+            message: "Company information updated.",
+            success: true
+        });
 
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
 export const listCompanies = async (req, res) => {
     try {
         const name = (req.query.name || req.query.q || '').toString();
         const location = (req.query.location || '').toString();
-        const filters = {};
-        if (name) filters.name = { $regex: name, $options: 'i' };
-        if (location) filters.location = { $regex: location, $options: 'i' };
-        const companies = await Company.find(filters).sort({ createdAt: -1 });
-        return res.status(200).json({ companies, success: true });
+
+        const where = {};
+        if (name) where.name = { contains: name, mode: 'insensitive' };
+        if (location) where.location = { contains: location, mode: 'insensitive' };
+
+        const companies = await prisma.company.findMany({
+            where,
+            orderBy: { createdAt: 'desc' }
+        });
+        return res.status(200).json({ companies: companies.map(c => addId(c)), success: true });
     } catch (error) {
         console.log(error);
+        return res.status(500).json({ message: "Internal server error", success: false });
     }
 }
