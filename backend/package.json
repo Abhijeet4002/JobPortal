@@ -6,10 +6,13 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "build": "npx prisma generate",
+    "build": "npx prisma generate && npx prisma db push",
     "migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "author": "",
   "license": "ISC",
@@ -25,10 +28,10 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2"
+    "multer": "^2.0.2",
+    "prisma": "^6.10.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
-    "prisma": "^6.10.1"
+    "nodemon": "^3.1.10"
   }
 }
