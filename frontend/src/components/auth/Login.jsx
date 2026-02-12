@@ -27,6 +27,9 @@ const Login = () => {
 
     const submitHandler = async (e) => {
         e.preventDefault();
+        if (!input.email || !input.password) {
+            return toast.error('Please enter email and password');
+        }
         if (!input.role) {
             return toast.error('Please select a role');
         }
@@ -37,6 +40,7 @@ const Login = () => {
                     "Content-Type": "application/json"
                 },
                 withCredentials: true,
+                timeout: 15000,
             });
             if (res.data.success) {
                 dispatch(setUser(res.data.user));
@@ -45,12 +49,14 @@ const Login = () => {
             }
         } catch (error) {
             console.log(error);
-            toast.error(error?.response?.data?.message || 'Login failed');
+            toast.error(error?.response?.data?.message || (error.code === 'ECONNABORTED' ? 'Request timed out — check your connection' : 'Login failed. Server may be starting up, try again in a moment.'));
         } finally {
             dispatch(setLoading(false));
         }
     }
     useEffect(() => {
+        // Always reset loading on mount (clears any stale persisted state)
+        dispatch(setLoading(false));
         if (user) {
             navigate("/");
         }

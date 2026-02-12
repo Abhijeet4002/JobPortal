@@ -33,6 +33,9 @@ const Signup = () => {
     }
     const submitHandler = async (e) => {
         e.preventDefault();
+        if (!input.fullname || !input.email || !input.phoneNumber || !input.password) {
+            return toast.error('Please fill in all fields');
+        }
         if (!input.role) {
             return toast.error('Please select a role');
         }
@@ -54,6 +57,7 @@ const Signup = () => {
             const res = await axios.post(`${USER_API_END_POINT}/register`, formData, {
                 headers: { 'Content-Type': "multipart/form-data" },
                 withCredentials: true,
+                timeout: 30000,
             });
             if (res.data.success) {
                 navigate("/login");
@@ -61,13 +65,15 @@ const Signup = () => {
             }
         } catch (error) {
             console.log(error);
-            toast.error(error?.response?.data?.message || 'Signup failed');
+            toast.error(error?.response?.data?.message || (error.code === 'ECONNABORTED' ? 'Request timed out — check your connection' : 'Signup failed. Server may be starting up, try again in a moment.'));
         } finally {
             dispatch(setLoading(false));
         }
     }
 
     useEffect(() => {
+        // Always reset loading on mount (clears any stale persisted state)
+        dispatch(setLoading(false));
         if (user) {
             navigate("/");
         }

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: jobportal
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install && npx prisma generate
+    startCommand: cd backend && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
