@@ -64,9 +64,14 @@ app.use((err, req, res, next) => {
 // ---------- Serve frontend in production ----------
 const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));
-// SPA catch-all: any non-API route serves index.html
-app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendDist, 'index.html'));
+
+// Catch-all: serve index.html for SPA routes, 404 JSON for unknown API paths
+app.use((req, res) => {
+    if (req.path.startsWith('/api/')) {
+        res.status(404).json({ message: 'API endpoint not found', success: false });
+    } else {
+        res.sendFile(path.join(frontendDist, 'index.html'));
+    }
 });
 
 app.listen(PORT, async () => {
