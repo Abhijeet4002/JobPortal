@@ -62,17 +62,25 @@ app.use((err, req, res, next) => {
 });
 
 // ---------- Serve frontend in production ----------
+import fs from "fs";
 const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-app.use(express.static(frontendDist));
+const indexHtml = path.join(frontendDist, 'index.html');
 
-// Catch-all: serve index.html for SPA routes, 404 JSON for unknown API paths
-app.use((req, res) => {
-    if (req.path.startsWith('/api/')) {
-        res.status(404).json({ message: 'API endpoint not found', success: false });
-    } else {
-        res.sendFile(path.join(frontendDist, 'index.html'));
-    }
-});
+if (fs.existsSync(indexHtml)) {
+    app.use(express.static(frontendDist));
+
+    // Catch-all: serve index.html for SPA routes, 404 JSON for unknown API paths
+    app.use((req, res) => {
+        if (req.path.startsWith('/api/')) {
+            res.status(404).json({ message: 'API endpoint not found', success: false });
+        } else {
+            res.sendFile(indexHtml);
+        }
+    });
+    console.log('Serving frontend from', frontendDist);
+} else {
+    console.log('Frontend dist not found — skipping static file serving (dev mode)');
+}
 
 app.listen(PORT, async () => {
     await prisma.$connect();
