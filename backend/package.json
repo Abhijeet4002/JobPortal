@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "build": "cd ../frontend && npm install --include=dev && npm run build && cd ../backend && npx prisma generate && npx prisma db push",
+    "build": "npx prisma generate && npx prisma db push",
     "migrate": "npx prisma migrate deploy",
     "db:push": "npx prisma db push",
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -2,8 +2,6 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 import prisma from "./utils/db.js";
 import userRoute from "./routes/user.route.js";
 import companyRoute from "./routes/company.route.js";
@@ -11,9 +9,6 @@ import jobRoute from "./routes/job.route.js";
 import applicationRoute from "./routes/application.route.js";
 
 dotenv.config({});
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -60,27 +55,6 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ message: 'Internal server error', success: false });
 });
-
-// ---------- Serve frontend in production ----------
-import fs from "fs";
-const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-const indexHtml = path.join(frontendDist, 'index.html');
-
-if (fs.existsSync(indexHtml)) {
-    app.use(express.static(frontendDist));
-
-    // Catch-all: serve index.html for SPA routes, 404 JSON for unknown API paths
-    app.use((req, res) => {
-        if (req.path.startsWith('/api/')) {
-            res.status(404).json({ message: 'API endpoint not found', success: false });
-        } else {
-            res.sendFile(indexHtml);
-        }
-    });
-    console.log('Serving frontend from', frontendDist);
-} else {
-    console.log('Frontend dist not found — skipping static file serving (dev mode)');
-}
 
 app.listen(PORT, async () => {
     await prisma.$connect();
